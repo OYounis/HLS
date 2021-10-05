@@ -1,5 +1,36 @@
 #include "includes.h"
+
 //#pragma HLS unroll
+
+ap_uint<SIZE_N> barrett_reduction(
+	ap_uint<SIZE_N> modulus
+	){
+
+	ap_uint<SIZE_N> temp_1;
+	ap_uint<SIZE_N+1> temp_2;
+	ap_uint<2*SIZE_N+1> temp_3;
+
+	ap_uint<SIZE_N> result;
+
+	temp_1 = ap_uint<SIZE_N+1>(R_CONST) >> (SIZE_N - 1);
+	temp_2 = ap_uint<2*SIZE_N+1>(R_CONST2) / modulus;
+
+	temp_3 = temp_1 * temp_2;
+
+	result = temp_3 >> (SIZE_N - 1);
+	return result;
+}
+
+ap_uint<SIZE_N> square_r(
+	ap_uint<SIZE_N> modulus
+	){
+
+	ap_uint<SIZE_N> r_reduced;
+
+	r_reduced = barrett_reduction(modulus);
+
+	return barrett_reduction(r_reduced * r_reduced);
+}
 
 #if(MONT_IMP == 1)
     ap_uint<SIZE_N> rad2_mont_mult(
@@ -14,7 +45,7 @@
         ap_uint<SIZE_N> temp_2;
 
         result = 0;
-        
+
         for(int i = 0; i < SIZE_N; i++){
 
             temp_1 = multiplicand[i] ? multiplier : ap_uint<SIZE_N>(0);
@@ -26,7 +57,7 @@
                 result = (temp_2 + modulus) >> 1; //divide by 2
             }
         }
-        
+
         return result;
     }
 
@@ -39,12 +70,12 @@
     ){
         ap_uint<SIZE_N> result;
         ap_uint<1> temp_1;
-        
+
         ap_uint<SIZE_N> temp_2;
         ap_uint<SIZE_N> temp_3;
 
         result = 0;
-        
+
         for(int i = 0; i < SIZE_N; i++){
             temp_1 = result[0] ^ (multiplicand[i] & multiplier[0]);
             temp_2 = temp_1? modulus : ap_uint<SIZE_N>(0);
@@ -52,15 +83,14 @@
 
             result = (result + temp_3 + temp_2) >> 1;
         }
-        
+
         return result;
-    } 
+    }
 #endif
 
 ap_uint<SIZE_N> mont_mod_mult(
 
 #ifndef CONST_N
-	ap_uint<SIZE_N> R_PRIME,
 	ap_uint<SIZE_N> R_SQUARED,
 #endif
 
@@ -104,6 +134,9 @@ ap_uint<SIZE_N> mod_mult(
 /*	SQUARE-AND-MULTPLY EXPONENTIATION	*/
 
 ap_uint<SIZE_N> sqrmul_exp(
+#ifndef CONST_N
+	ap_uint<SIZE_N> R_SQUARED,
+#endif
 	ap_uint<SIZE_N> base,
 	ap_uint<SIZE_N> exponent,
 
@@ -120,9 +153,9 @@ ap_uint<SIZE_N> sqrmul_exp(
 	else result = 1;
 
 	for(int i = 0; i < SIZE_N; i++){
-		temp = mont_mod_mult(temp, temp, modulus);
+		temp = mont_mod_mult(R_SQUARED, temp, temp, modulus);
 		exponent = exponent >> 1;
-		if(exponent & 1) result = mont_mod_mult(result, temp, modulus);
+		if(exponent & 1) result = mont_mod_mult(R_SQUARED, result, temp, modulus);
 	}
 
 	return result;
@@ -133,7 +166,6 @@ ap_uint<SIZE_N> mont_exp(
 	ap_uint<SIZE_N> base_prime,
 	ap_uint<SIZE_N> exponent,
 	ap_uint<SIZE_N> i_prime,
-	ap_uint<SIZE_N> r_prime,
 	ap_uint<SIZE_N> modulus
 ){
 
@@ -156,21 +188,33 @@ ap_uint<SIZE_N> mont_exp(
 	return result;
 }
 
+ap_uint<SIZE_N> paillier_encrypt(
+	ap_uint<SIZE_N> i_prime,
+	ap_uint<SIZE_N> square_r,
 
-/*********************************************************************************************************/
-/*********************************************************************************************************/
+	ap_uint<SIZE_N> key_g,
+	ap_uint<SIZE_N> message,
 
+	ap_uint<SIZE_N> r,
+	ap_uint<SIZE_N> n,
 
-ap_uint<SIZE_N> mexp(
-	ap_uint<SIZE_N> base,
-	ap_uint<SIZE_N> exponent,
-
-	ap_uint<SIZE_N> modulus
+	ap_uint<SIZE_N> n_squared
 ){
-	//return sqrmul_exp(base, exponent, modulus);
-    //return rad2_mont_mult(base, exponent, modulus);
-    return mont_mod_mult(modulus,base, exponent);
-	//return mont_exp(11, exponent,9, 18, modulus);
-	//return mont_exp(base, exponent, modulus);
-	//return mul(base, exponent, modulus);
+
+	ap_uint<SIZE_N> temp_1;
+	ap_uint<SIZE_N> key_g_prime;
+
+	ap_uint<SIZE_N> temp_2;
+	ap_uint<SIZE_N> r_prime;
+
+	ap_uint<SIZE_N> result;
+
+	key_g_prime = mont_mod_mult(square_r, key_g, R_CONST, n_squared);
+	temp_1 = mont_exp(key_g_prime, message, i_prime, n_squared);
+
+	r_prime = mont_mod_mult(square_r, r, R_CONST, n_squared);
+	temp_2 = mont_exp(r_prime, n, i_prime, n_squared);
+
+	result = mont_mod_mult(square_r, temp_1, temp_2, n_squared);
+	return result;
 }
