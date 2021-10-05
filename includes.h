@@ -5,28 +5,27 @@
 
 //N can be 128, 256, 512, 1024
 #define SIZE_N 128
-#define MONT_IMP 1
-#define CONST_N
+#define MONT_IMP 2
+//#define CONST_N
 
 #ifdef CONST_N
-	#define R_PPRIME
-	#define R_SQUARED 12
-#endif
-
-
+	#define R_CONST
+	#define R_CONST2 12
+#else
 	#if (SIZE_N == 128)
-    	#define R	3.4028237e+38//2^n
-    	#define R_prime	2.938735877055739 //
-
+    	#define R_CONST	 	3.4028237e+38	//2^n
+    	#define R_CONST2 	1.1579209e+77	//2^2n
+        
 	#elif (SIZE_N == 256)
-    	#define R	1.1579209e+77//2^n
-    	#define R_prime	8.636168555094478//
+    	#define R_CONST		1.1579209e+77	//2^n
+    	#define R_CONST2	1.340781e+154	//2^2n
 
 	#elif (SIZE_N == 512)
-    	#define R	1.340781e+154//2^n
-    	#define R_prime	7.458340731200255//
+    	#define R_CONST		1.340781e+154	//2^n
+    	#define R_CONST2	1.797693134e+308//2^2n
 
 	#else //(SIZE_N == 1024)
-    	#define R	1.797693134 E+308//2^n
-    	#define R_prime	5.562684646268309//
+    	#define R_CONST		1.797693134e+308//2^n
+    	#define R_CONST 	3.231700607e+616//2^2n
 	#endif
+#endif
